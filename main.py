@@ -21,13 +21,8 @@ LINE = "I didn't eat your homework \u2014 I taste-tested it, and it failed. Page
 DEFAULT_OUTPUT_PATH = "/output/entry.txt"
 
 
-def validate(line: str) -> None:
-    """Enforce the brief: one clean line of 1-200 characters.
-
-    Raises SystemExit with a plain-language reason when the line
-    breaks any rule, so a bad edit fails loudly instead of shipping
-    an entry the gate would refuse.
-    """
+def _check_single_line(line: str) -> None:
+    """Check the line is one clean physical line with no padding."""
     if not line:
         raise SystemExit("Invalid line: entry must be non-empty.")
     if not line.strip():
@@ -36,21 +31,36 @@ def validate(line: str) -> None:
         raise SystemExit(
             "Invalid line: entry must not have leading or trailing whitespace."
         )
+    if "\n" in line or "\r" in line:
+        raise SystemExit(
+            "Invalid line: entry must be a single line with no newline characters."
+        )
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in line):
+        raise SystemExit("Invalid line: entry must not contain control characters.")
+
+
+def _check_length(line: str) -> None:
+    """Check the character count stays inside the brief's limit."""
     if not MIN_CHARS <= len(line) < MAX_CHARS:
         raise SystemExit(
             f"Invalid line: {len(line)} characters, outside the "
             f"{MIN_CHARS}-{MAX_CHARS} character limit."
         )
-    if "\n" in line or "\r" in line:
-        raise SystemExit(
-            "Invalid line: entry must be a single line with no newline characters."
-        )
+
+
+def validate(line: str) -> None:
+    """Enforce the brief: one clean line of 1-200 characters.
+
+    Raises SystemExit with a plain-language reason when the line
+    breaks any rule, so a bad edit fails loudly instead of shipping
+    an entry the gate would refuse.
+    """
+    _check_single_line(line)
+    _check_length(line)
     if not line.endswith("."):
         raise SystemExit("Invalid line: entry must end with a period.")
     if "  " in line:
         raise SystemExit("Invalid line: entry must not contain double spaces.")
-    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in line):
-        raise SystemExit("Invalid line: entry must not contain control characters.")
 
 
 def main() -> None:
@@ -65,7 +75,9 @@ def main() -> None:
         written = f.read()
     if written != LINE:
         raise SystemExit(
-            "Write verification failed: entry file content does not match the line."
+            "Write verification failed: entry file content does not match "
+            f"the line (expected {len(LINE)} chars, read back {len(written)} "
+            f"chars from {output_path!r})."
         )
 
 
